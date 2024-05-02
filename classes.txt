@@ -1,0 +1,16 @@
+blank
+red
+blue
+red_red
+blue_blue
+red_blue
+blue_red
+red_red_red
+red_red_blue
+red_blue_red
+red_blue_blue
+blue_red_blue
+blue_red_red
+blue_blue_red
+blue-blue_blue
+anchor
