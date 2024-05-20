@@ -19,7 +19,13 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 from utils.datasets import letterbox
 
+import client
+
 def detect(save_img=False):
+    # Tcp 服务器 
+    TcpClient = client.TcpClient()
+    TcpClient.attempt_connection(TcpClient.server_addr)
+    
     out, source, weights, view_img, save_txt, imgsz = \
         opt.save_dir, opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     webcam = source == '0' or source.startswith(('rtsp://', 'rtmp://', 'http://')) or source.endswith('.txt')
@@ -62,6 +68,7 @@ def detect(save_img=False):
     pipeline.start(config)
     align_to_color = rs.align(rs.stream.color)
     while True:
+        
         start = time.time()
         # Wait for a coherent pair of frames（一对连贯的帧）: depth and color
         frames = pipeline.wait_for_frames()
@@ -95,9 +102,11 @@ def detect(save_img=False):
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
         t2 = time_synchronized()
-
+        
+        
+        final=[{"time": time.time(), "x1" : 0, "y1" : 0, "x2" : 0, "y2" : 0, "color" : "None"}]
         for i, det in enumerate(pred):  # detections per image
-            final=[]
+            #final.append({"time": time.time()})
             p, s, im0 = path[i], '%g: ' % i, im0s[i].copy()
             s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -112,7 +121,7 @@ def detect(save_img=False):
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
-                    data=[]
+                    data = {"time": 0, "x1" : 0, "y1" : 0, "x2" : 0, "y2" : 0, "color" : "None"}
 
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                     line = (cls, conf, *xywh) if opt.save_conf else (cls, *xywh)  # label format
@@ -143,19 +152,22 @@ def detect(save_img=False):
                     class_index = cls
 
                     object_name = names[int(cls)]
-                    data = [x1, y1, x2, y2, object_name]
+                    #data = [x1, y1, x2, y2, object_name]
+                    data = {"time" : time.time(), "x1" : x1, "y1" : y1, "x2" : x2, "y2" : y2, "color" : object_name}
 
                     original_img = img
                     cropped_img = img[y1:y2, x1: x2]
                     final.append(data)
                     # Print time (inference + NMS)
-            print(final)
-
             # Stream results
             if view_img:
                 cv2.imshow(p, im0)
                 if cv2.waitKey(1) == ord('q'):  # q to quit
                     raise StopIteration
+        print(final)
+        if(TcpClient.tcp_client(final) == -1):
+            TcpClient.attempt_connection(TcpClient.server_addr)
+            
     print('Done. (%.3fs)' % (time.time() - t0))
 
 
